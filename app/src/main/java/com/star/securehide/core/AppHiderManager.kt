@@ -9,33 +9,48 @@ import java.io.RandomAccessFile
 
 object AppHiderManager {
 
-    // فحص هل الروت متاح ومقبول
+    // فحص الروت
     fun isRoot(): Boolean = Shell.isAppGrantedRoot() == true
 
-    // فحص هل Shizuku متاح ويعمل
+    // فحص Shizuku
     fun isShizukuAvailable(): Boolean {
         return try {
-            Shizuku.pingBinder() && Shizuku.checkPermission() == PackageManager.PERMISSION_GRANTED
+            if (Shizuku.pingBinder()) {
+                val perm = Shizuku.checkSelfPermission()
+                perm == PackageManager.PERMISSION_GRANTED
+            } else {
+                false
+            }
         } catch (e: Exception) {
             false
         }
     }
 
-    // إخفاء التطبيق (يدعم روت أو Shizuku)
+    // إخفاء التطبيق (روت أو Shizuku)
     fun setAppHidden(packageName: String, hide: Boolean): Boolean {
         val action = if (hide) "disable-user --user 0" else "enable"
         val command = "pm $action $packageName"
 
         return when {
-            // 1. إذا كان الروت متاحاً
             isRoot() -> {
                 val result = Shell.cmd(command).exec()
                 result.isSuccess
             }
-            // 2. إذا كان Shizuku متاحاً (بدون روت)
             Shizuku.pingBinder() -> {
                 try {
-                    val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
+                    // استدعاء آمن لتجنب مشاكل الصلاحيات البرمجية أثناء البناء
+                    val newProcessMethod = Shizuku::class.java.getMethod(
+                        "newProcess",
+                        Array<String>::class.java,
+                        Array<String>::class.java,
+                        String::class.java
+                    )
+                    val process = newProcessMethod.invoke(
+                        null,
+                        arrayOf("sh", "-c", command),
+                        null,
+                        null
+                    ) as Process
                     process.waitFor() == 0
                 } catch (e: Exception) {
                     false
