@@ -1,39 +1,27 @@
 package com.star.securehide
 
-import android.content.Context
-import android.content.Intent
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
+import android.content.*
+import android.content.pm.*
 import android.graphics.drawable.Drawable
 import android.net.Uri
-import android.os.Bundle
+import android.os.*
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.text.font.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -45,9 +33,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    AppRootNavigator(this)
+            MaterialTheme(
+                colorScheme = darkColorScheme(
+                    primary = Color(0xFF00E5FF),
+                    background = Color(0xFF0A0E17),
+                    surface = Color(0xFF121824)
+                )
+            ) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    AppNavigation(this)
                 }
             }
         }
@@ -55,217 +49,212 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppRootNavigator(context: Context) {
+fun AppNavigation(context: Context) {
     var isUnlocked by remember { mutableStateOf(false) }
-
-    if (!isUnlocked) {
-        DisguiseStopwatchScreen(onUnlock = { isUnlocked = true })
-    } else {
-        SecretManagerScreen(context = context, onLock = { isUnlocked = false })
+    AnimatedContent(targetState = isUnlocked, label = "") { unlocked ->
+        if (!unlocked) {
+            StopwatchScreen(context) { isUnlocked = true }
+        } else {
+            DashboardScreen(context) { isUnlocked = false }
+        }
     }
 }
 
 @Composable
-fun DisguiseStopwatchScreen(onUnlock: () -> Unit) {
-    var timeInMillis by remember { mutableLongStateOf(0L) }
-    var isRunning by remember { mutableStateOf(false) }
-    var secretClickCount by remember { mutableIntStateOf(0) }
-    var lastClickTime by remember { mutableLongStateOf(0L) }
+fun StopwatchScreen(context: Context, onUnlock: () -> Unit) {
+    var time by remember { mutableLongStateOf(0L) }
+    var running by remember { mutableStateOf(false) }
+    var clicks by remember { mutableIntStateOf(0) }
+    var lastClick by remember { mutableLongStateOf(0L) }
+    val vib = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
-    LaunchedEffect(isRunning) {
-        while (isRunning) {
-            delay(10L)
-            timeInMillis += 10L
+    LaunchedEffect(running) {
+        while (running) {
+            delay(10)
+            time += 10
         }
     }
 
-    val minutes = (timeInMillis / 1000) / 60
-    val seconds = (timeInMillis / 1000) % 60
-    val millis = (timeInMillis % 1000) / 10
-
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Text("Stopwatch", style = MaterialTheme.typography.titleLarge, color = Color.Gray)
-        Spacer(modifier = Modifier.height(40.dp))
+        Text(
+            text = "CHRONOMETER",
+            letterSpacing = 4.sp,
+            color = Color(0xFF00E5FF).copy(alpha = 0.6f),
+            modifier = Modifier.padding(top = 20.dp)
+        )
 
         Box(
             modifier = Modifier
                 .size(260.dp)
+                .border(2.dp, Color(0xFF00E5FF), CircleShape)
+                .background(Color(0xFF121824))
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable {
                     val now = System.currentTimeMillis()
-                    if (now - lastClickTime < 600) {
-                        secretClickCount++
-                    } else {
-                        secretClickCount = 1
-                    }
-                    lastClickTime = now
-
-                    if (secretClickCount >= 5) {
-                        secretClickCount = 0
+                    vib.vibrate(VibrationEffect.createOneShot(40, 255))
+                    if (now - lastClick < 500) clicks++ else clicks = 1
+                    lastClick = now
+                    if (clicks >= 5) {
+                        clicks = 0
+                        vib.vibrate(VibrationEffect.createOneShot(150, 255))
                         onUnlock()
                     }
                 },
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = String.format("%02d:%02d.%02d", minutes, seconds, millis),
-                fontSize = 42.sp,
+                text = String.format("%02d:%02d.%02d", (time / 1000) / 60, (time / 1000) % 60, (time % 1000) / 10),
+                fontSize = 40.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.primary
+                color = Color.White
             )
         }
 
-        Spacer(modifier = Modifier.height(50.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            FilledTonalButton(onClick = { timeInMillis = 0L; isRunning = false }) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("إعادة")
+        Row(
+            modifier = Modifier.padding(bottom = 40.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            OutlinedButton(onClick = { time = 0; running = false }) {
+                Text("إعادة ضبط", color = Color.White)
             }
-
             Button(
-                onClick = { isRunning = !isRunning },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                )
+                onClick = { running = !running },
+                colors = ButtonDefaults.buttonColors(containerColor = if (running) Color.Red else Color(0xFF00E5FF))
             ) {
-                Icon(if (isRunning) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(if (isRunning) "إيقاف" else "تشغيل")
+                Text(if (running) "إيقاف" else "ابدأ", color = Color.Black)
             }
         }
     }
 }
 
-data class InstalledApp(
-    val name: String,
-    val packageName: String,
-    val icon: Drawable,
-    var isHidden: Boolean = false
-)
+data class AppItem(val name: String, val pkg: String, val icon: Drawable, var hidden: Boolean)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SecretManagerScreen(context: Context, onLock: () -> Unit) {
-    var appList by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var hasShizukuPermission by remember { mutableStateOf(AppHiderManager.isShizukuAvailable()) }
-
-    fun loadApps() {
-        val pm = context.packageManager
-        val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-        val filtered = packages.filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
-            .map {
-                InstalledApp(
-                    name = it.loadLabel(pm).toString(),
-                    packageName = it.packageName,
-                    icon = it.loadIcon(pm),
-                    isHidden = !it.enabled
-                )
-            }.sortedBy { it.name }
-        appList = filtered
-        isLoading = false
-    }
+fun DashboardScreen(context: Context, onLock: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+    var tab by remember { mutableIntStateOf(0) }
+    var apps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    val root = AppHiderManager.isRootAvailable()
+    val shizuku = AppHiderManager.isShizukuAvailable()
 
     LaunchedEffect(Unit) {
-        loadApps()
+        val pm = context.packageManager
+        apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
+            .map {
+                AppItem(it.loadLabel(pm).toString(), it.packageName, it.loadIcon(pm), !it.enabled)
+            }.sortedBy { it.name }
+        loading = false
+    }
+
+    val filtered = apps.filter {
+        (it.name.contains(query, true) || it.pkg.contains(query, true)) &&
+                when (tab) {
+                    1 -> it.hidden
+                    2 -> !it.hidden
+                    else -> true
+                }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("لوحة التحكم السرية") },
+                title = { Text("SecureHide Pro", color = Color.White) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E17)),
                 actions = {
                     IconButton(onClick = onLock) {
-                        Icon(Icons.Default.VisibilityOff, contentDescription = "قفل")
+                        Icon(Icons.Default.Lock, null, tint = Color(0xFF00E5FF))
                     }
                 }
             )
         }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            
-            // إذا لم يتوفر روت ولا Shizuku، نظهر زر لطلب صلاحية Shizuku
-            if (!AppHiderManager.isRoot() && !hasShizukuPermission) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+    ) { pad ->
+        Column(modifier = Modifier.padding(pad).fillMaxSize().background(Color(0xFF0A0E17))) {
+            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(Color(0xFF121824))
+                        .border(1.dp, if (root) Color(0xFF00E5FF) else Color.Red, RoundedCornerShape(8.dp))
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("مطلوب صلاحية للعمل بدون روت", fontWeight = FontWeight.Bold)
-                        Text("الرجاء تشغيل تطبيق Shizuku على هاتفك ثم الضغط على الزر أدناه لتفعيل الإخفاء.", fontSize = 12.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = {
-                            try {
-                                Shizuku.requestPermission(101)
-                                hasShizukuPermission = AppHiderManager.isShizukuAvailable()
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "تأكد من تشغيل تطبيق Shizuku أولاً!", Toast.LENGTH_LONG).show()
-                            }
-                        }) {
-                            Text("ربط مع Shizuku")
-                        }
-                    }
+                    Text("الروت: ${if (root) "نشط" else "متوقف"}", color = Color.White, fontSize = 12.sp)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(Color(0xFF121824))
+                        .border(1.dp, if (shizuku) Color(0xFF00E5FF) else Color.Red, RoundedCornerShape(8.dp))
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("شيزوكو: ${if (shizuku) "نشط" else "متوقف"}", color = Color.White, fontSize = 12.sp)
                 }
             }
 
-            if (isLoading) {
+            if (!root && !shizuku) {
+                Button(
+                    onClick = { try { Shizuku.requestPermission(101) } catch (e: Exception) {} },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("ربط مع Shizuku الآن")
+                }
+            }
+
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("بحث...") },
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            )
+
+            TabRow(selectedTabIndex = tab, containerColor = Color(0xFF0A0E17)) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }) { Text("الكل", modifier = Modifier.padding(8.dp)) }
+                Tab(selected = tab == 1, onClick = { tab = 1 }) { Text("المخفية", modifier = Modifier.padding(8.dp)) }
+                Tab(selected = tab == 2, onClick = { tab = 2 }) { Text("النشطة", modifier = Modifier.padding(8.dp)) }
+            }
+
+            if (loading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else {
-                LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-                    items(appList) { app ->
-                        var isChecked by remember { mutableStateOf(app.isHidden) }
-
+                LazyColumn(modifier = Modifier.weight(1f).padding(16.dp)) {
+                    items(filtered) { app ->
+                        var checked by remember { mutableStateOf(app.hidden) }
                         Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF121824))
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Image(
-                                    bitmap = app.icon.toBitmap(96, 96).asImageBitmap(),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp)
-                                )
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Image(bitmap = app.icon.toBitmap(96, 96).asImageBitmap(), null, modifier = Modifier.size(40.dp))
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(app.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                                    Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                    Text(app.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(app.pkg, color = Color.Gray, fontSize = 10.sp, maxLines = 1)
                                 }
                                 Switch(
-                                    checked = isChecked,
-                                    onCheckedChange = { checked ->
-                                        val success = AppHiderManager.setAppHidden(app.packageName, checked)
-                                        if (success) {
-                                            isChecked = checked
-                                            Toast.makeText(context, if (checked) "تم إخفاء التطبيق" else "تم إظهار التطبيق", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "فشل الإجراء! تأكد من تفعيل Shizuku أو الروت.", Toast.LENGTH_LONG).show()
+                                    checked = checked,
+                                    onCheckedChange = {
+                                        if (AppHiderManager.setAppHiddenState(app.pkg, it)) {
+                                            checked = it
+                                            app.hidden = it
                                         }
                                     }
                                 )
                             }
                         }
                     }
-
-                    item {
-                        Spacer(modifier = Modifier.height(20.dp))
-                        SupportSection(context)
-                        Spacer(modifier = Modifier.height(30.dp))
-                    }
+                    item { SupportCard(context) }
                 }
             }
         }
@@ -273,40 +262,22 @@ fun SecretManagerScreen(context: Context, onLock: () -> Unit) {
 }
 
 @Composable
-fun SupportSection(context: Context) {
+fun SupportCard(context: Context) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF121824))
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("الدعم الفني والمساعدة", fontWeight = FontWeight.Bold)
-            Text("SecureHide v1.2.0", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().clickable {
-                    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:starsyria2500@gmail.com"))
-                    context.startActivity(intent)
-                }.padding(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("starsyria2500@gmail.com", fontSize = 14.sp)
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().clickable {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=963938466549"))
-                    context.startActivity(intent)
-                }.padding(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF25D366), modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("+963 938 466 549", color = Color(0xFF25D366), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
+        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("الدعم الفني والمساعدة", fontWeight = FontWeight.Bold, color = Color.White)
+            Text("SecureHide Pro v1.3.0", color = Color(0xFF00E5FF), fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("starsyria2500@gmail.com", color = Color.Gray, modifier = Modifier.clickable {
+                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:starsyria2500@gmail.com")))
+            })
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("واتساب: +963 938 466 549", color = Color(0xFF25D366), fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=963938466549")))
+            })
         }
     }
 }
